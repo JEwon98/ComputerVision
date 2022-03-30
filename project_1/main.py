@@ -19,17 +19,22 @@ hoS = np.zeros(shape=(2,4,9,9))
 #compare Histogram result
 comp_hist_res = np.zeros(shape=(4,4))
 hist = [0 for _ in range(8)]
+# to draw final image with matching line, remember the position of mouse click
 xdir = [0 for _ in range(8)]
 ydir = [0 for _ in range(8)]
-pair = [-1,-1,-1,-1]
+# to make pair of each point
+pair = [-1, -1, -1, -1]
+# count click
 click = 0
-PatchSize=9
+# patch size
+PatchSize = 9
+
 
 def mouse_event(event, x, y, flags, param):
-    global click, hoS, patch_gradient, patch, hog
+    global click, hoS, patch_gradient, patch, hog, PatchSize
     patch_size = PatchSize // 2
     if event == cv2.EVENT_FLAG_LBUTTON:
-        print("x =", x, ", y = ", y, ", click = ", click)
+        # print("x =", x, ", y = ", y, ", click = ", click)
         xdir[click]=x
         ydir[click]=y
         # 패치 global 저장
@@ -57,61 +62,91 @@ def mouse_event(event, x, y, flags, param):
         # save the Degree global
         patch_gradient[click // 4 % 2][click % 4] = (grad_direction + 360) % 360
         hog[click // 4 % 2][click % 4], bins = np.histogram(patch_gradient[click // 4 % 2][click % 4].flatten(), np.arange(0,361,45))
-        print("grad_size")
-        print(grad_size)
-        print("grad_direction")
-        print(patch_gradient[click // 4 % 2][click % 4])
-        print("-----------calcHist-------------")
-        print(hog[click // 4 % 2][click % 4])
-        # gradient histogram 저장해서, 한번에 보여줘야한다.
-        # plt.hist(np.array(patch_gradient[click // 4 % 2][click % 4]).flatten(), bins=8, label="grad histo")
-        # plt.legend()
-        # plt.show()
+        # print("grad_size")
+        # print(grad_size)
+        # print("grad_direction")
+        # print(patch_gradient[click // 4 % 2][click % 4])
+        # print("-----------calcHist-------------")
+        # print(hog[click // 4 % 2][click % 4])
         cv2.putText(param, str(click % 4), (x-(patch_size*3), y-(patch_size*3)),fontFace=cv2.FONT_ITALIC, fontScale=1.5,
                     thickness=1, color=(250,250,250), lineType=cv2.LINE_AA)
         cv2.rectangle(param, (x-patch_size, y-patch_size), (x+patch_size, y+patch_size), 1)
         click += 1
 
+
 def findBest():
     global comp_hist_res, hog,que,pair
+    pair=[-1 for _ in range(8)]
     for i in range(4):
         for j in range(4):
             comp_hist_res[i][j] = cv2.compareHist(hog[0][i].astype('float32'), hog[1][j].astype('float32'), cv2.HISTCMP_BHATTACHARYYA)
             que.put((comp_hist_res[i][j],i,j))
-            #print(i," , ",j, " , ",comp_hist_res[i][j])
     for i in range(16):
         tmp, first, second = que.get()
-        print(tmp," ",first," ",second)
-        if(pair[first]==-1):
-            pair[first]=second
+        if pair[first] == -1:
+            pair[first] = second
 
 
+def find_best_with_no_duplicate():
+    global comp_hist_res, hog,que,pair
+    pair=[-1 for _ in range(8)]
+    visit = [-1 for _ in range(4)]
+    for i in range(4):
+        for j in range(4):
+            comp_hist_res[i][j] = cv2.compareHist(hog[0][i].astype('float32'), hog[1][j].astype('float32'), cv2.HISTCMP_BHATTACHARYYA)
+            que.put((comp_hist_res[i][j],i,j))
+    for i in range(16):
+        tmp, first, second = que.get()
+        if pair[first] == -1 and visit[second] == -1:
+            pair[first] = second
+            visit[second] = 1
 
-src = np.full((500, 500), 255, dtype=np.uint8)
-src1 = cv2.imread("1st.jpg", cv2.IMREAD_GRAYSCALE)
+
+def plot_histogram_of_gradient():
+    degree = ['0', '45', '90', '135', '180', '225', '270', '315']
+    plt.figure(figsize=(16, 8))
+    plt.subplot(241).set_title("1-0")
+    plt.bar(np.arange(8), hog[0][0], align='edge', tick_label=degree)
+
+    plt.subplot(242).set_title("1-1")
+    plt.bar(np.arange(8), hog[0][1], align='edge', tick_label=degree)
+
+    plt.subplot(243).set_title("1-2")
+    plt.bar(np.arange(8), hog[0][2], align='edge', tick_label=degree)
+
+    plt.subplot(244).set_title("1-3")
+    plt.bar(np.arange(8), hog[0][3], align='edge', tick_label=degree)
+
+    plt.subplot(245).set_title("2-0")
+    plt.bar(np.arange(8), hog[1][0], align='edge', tick_label=degree)
+
+    plt.subplot(246).set_title("2-1")
+    plt.bar(np.arange(8), hog[1][1], align='edge', tick_label=degree)
+
+    plt.subplot(247).set_title("2-2")
+    plt.bar(np.arange(8), hog[1][2], align='edge', tick_label=degree)
+
+    plt.subplot(248).set_title("2-3")
+    plt.bar(np.arange(8), hog[1][3], align='edge', tick_label=degree)
+    plt.show()
+
+
 src2 = cv2.imread("2nd.jpg", cv2.IMREAD_GRAYSCALE)
-
-
-# print(src1[0][0])
-# cv2.imshow("draw", src1)
-# cv2.setMouseCallback("draw", mouse_event, src1)
-# while(True):
-#     cv2.imshow("draw",src1)
-#     k = cv2.waitKey(1) & 0xFF
-#     if k == 27:
-#         break
-# cv2.destroyAllWindows()
-
-# resize
-dst1 = cv2.resize(src1, dsize=(0, 0), fx=0.2, fy=0.2, interpolation=cv2.INTER_AREA)
-dst2 = cv2.resize(src2, dsize=(0, 0), fx=0.2, fy=0.2, interpolation=cv2.INTER_AREA)
+src1 = cv2.imread("1st.jpg", cv2.IMREAD_GRAYSCALE)
+# resize the images
+scaling = 0.1
+dst1 = cv2.resize(src1, dsize=(0, 0), fx=scaling, fy=scaling, interpolation=cv2.INTER_AREA)
+dst2 = cv2.resize(src2, dsize=(0, 0), fx=scaling, fy=scaling, interpolation=cv2.INTER_AREA)
+dst1 = cv2.GaussianBlur(dst1,(5,5),0)
+dst2 = cv2.GaussianBlur(dst2,(5,5),0)
 addh = cv2.hconcat([dst1, dst2])
 height, width = dst1.shape
-print(height, width)
+
 cv2.imshow("1st.jpg", dst1)
 cv2.imshow("2nd.jpg", dst2)
 cv2.setMouseCallback("1st.jpg", mouse_event, dst1)
 cv2.setMouseCallback("2nd.jpg", mouse_event, dst2)
+
 while(True):
     cv2.imshow("1st.jpg", dst1)
     cv2.imshow("2nd.jpg", dst2)
@@ -119,50 +154,16 @@ while(True):
     if k == 27:
         break
 
-degree = ['0','45','90','135','180','225','270','315']
-plt.figure(figsize=(16,8))
-plt.subplot(241).set_title("1-0")
-plt.bar(np.arange(8), hog[0][0], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[0][0]).flatten(), bins=8, label='1', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(242).set_title("1-1")
-plt.bar(np.arange(8), hog[0][1], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[0][0]).flatten(), bins=8, label='1', edgecolor='whitesmoke', linewidth=1)
-#plt.hist(np.array(patch_gradient[0][1]).flatten(), bins=8, label='2', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(243).set_title("1-2")
-plt.bar(np.arange(8), hog[0][2], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[0][2]).flatten(), bins=8, label='3', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(244).set_title("1-3")
-plt.bar(np.arange(8), hog[0][3], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[0][3]).flatten(), bins=8, label='4', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(245).set_title("2-0")
-plt.bar(np.arange(8), hog[1][0], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[1][0]).flatten(), bins=8, label='5', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(246).set_title("2-1")
-plt.bar(np.arange(8), hog[1][1], align='edge',tick_label=degree)
-# plt.hist(np.array(patch_gradient[1][1]).flatten(), bins=8, label='6', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(247).set_title("2-2")
-plt.bar(np.arange(8), hog[1][2], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[1][2]).flatten(), bins=8, label='7', edgecolor='whitesmoke',linewidth=1)
-
-plt.subplot(248).set_title("2-3")
-plt.bar(np.arange(8), hog[1][3], align='edge',tick_label=degree)
-#plt.hist(np.array(patch_gradient[1][3]).flatten(), bins=8, label='8', edgecolor='whitesmoke',linewidth=1)
-#plt.subplot(241).set_title("1-1")
-plt.show()
+plot_histogram_of_gradient()
 findBest()
+# find_best_with_no_duplicate()
 
-while(True):
+# while(True):
+#     k = cv2.waitKey(1) & 0xFF
+#     if k == 27:
+#         break
 
-    k = cv2.waitKey(1) & 0xFF
-    if k == 27:
-        break
-#draw rectangle and text on Adding image
+# draw rectangle and text on Adding image
 for i in range(8):
     if i <=3:
         cv2.putText(addh, str(i), (xdir[i]-((PatchSize//2)*3), ydir[i]-((PatchSize//2)*3)),fontFace=cv2.FONT_ITALIC, fontScale=1.5,
@@ -172,17 +173,11 @@ for i in range(8):
         cv2.putText(addh, str(i%4), (width +xdir[i]-((PatchSize//2)*3), ydir[i]-((PatchSize//2)*3)),fontFace=cv2.FONT_ITALIC, fontScale=1.5,
                     thickness=1, color=(250,250,250), lineType=cv2.LINE_AA)
         cv2.rectangle(addh, (width + xdir[i]-(PatchSize//2), ydir[i]-(PatchSize//2)), (width + xdir[i]+(PatchSize//2), ydir[i]+(PatchSize//2)), 1)
-#draw pair line
+
+# draw pair line
 for i in range(4):
     cv2.line(addh, (xdir[i], ydir[i]), (width + xdir[pair[i]+4], ydir[pair[i]+4]), (0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
 
-cv2.imshow("addh",addh)
+cv2.imshow("addh", addh)
 cv2.waitKey()
-
-
-
-
-# cv2.imshow("e",src)
-# cv2.setMouseCallback("e",mouse_event,src)
-# cv2.waitKey()
 cv2.destroyAllWindows()
